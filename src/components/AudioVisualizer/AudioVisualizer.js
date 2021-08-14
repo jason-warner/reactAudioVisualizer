@@ -5,16 +5,42 @@ import './AudioVisualizer.css';
 const AudioVisualizer = () => {
   const
     canvasRef = useRef(null),
-    buttonRef = useRef(null),
-    songRef = useRef(null);
+    buttonRef = useRef(null);
+  // songRef = useRef(null);
 
   const audioVisualizerLogic = () => {
-    const
-      song = songRef.current,
-      context = new window.AudioContext();
+    // const
+    //   song = songRef.current,
+    // context = new window.AudioContext();
 
-    const audio = new Audio(song.src);
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    const request = new XMLHttpRequest();
+    const source = context.createBufferSource();
+    fetch("http://jplayer.org/audio/mp3/RioMez-01-Sleep_together.mp3")
+      .then(response => response.arrayBuffer())
+      .then((response) => {
+        context.decodeAudioData(response, (buffer) => {
+          source.buffer = buffer;
+          source.connect(context.destination);
+          // auto play
+          source.start(0); // start was previously noteOn
+        });
+      })
+    // request.open("GET", "http://jplayer.org/audio/mp3/RioMez-01-Sleep_together.mp3", true);
+    // request.responseType = "arraybuffer";
 
+    // request.onload = () => {
+    //   context.decodeAudioData(request.response, (buffer) => {
+    //     source.buffer = buffer;
+    //     source.connect(context.destination);
+    //     // auto play
+    //     source.start(0); // start was previously noteOn
+    //   });
+    // };
+
+    request.send();
+
+    const audio = new Audio(source);
     const
       canvas = canvasRef.current,
       muteButton = buttonRef.current;
@@ -36,10 +62,10 @@ const AudioVisualizer = () => {
 
     //config audio analyzer
     const
-      src = context.createMediaElementSource(audio),
+      // src = context.createMediaElementSource(audio),
       analyser = context.createAnalyser();
 
-    src.connect(analyser);
+    source.connect(analyser);
     analyser.connect(context.destination);
     analyser.fftSize = 256;
     const
@@ -53,6 +79,7 @@ const AudioVisualizer = () => {
       x = null;
 
     //core logic for the visualizer
+    const timeouts = [];
     const renderFrame = () => {
       ctx.fillStyle = "rgba(0,0,0,0)";
       requestAnimationFrame(renderFrame);
@@ -62,7 +89,6 @@ const AudioVisualizer = () => {
 
       for (let i = 0; i < bufferLength; i++) {
         barHeight = dataArray[i];
-
         let
           r = barHeight + (22 * (i / bufferLength)),
           g = 333 * (i / bufferLength),
@@ -72,14 +98,22 @@ const AudioVisualizer = () => {
         ctx.fillRect(x, HEIGHT - barHeight, barWidth, barHeight);
         x += barWidth + 1;
 
-        setTimeout(() => {
+        let timer = setTimeout(() => {
           ctx.clearRect(0, 0, WIDTH, HEIGHT)
-        }, 1);
+        }, 50);
+        timeouts.push(timer);
       }
     }
+    setTimeout(() => {
+      for (let i = 0; i < timeouts.length; i++) {
+        return clearTimeout(timeouts[i]);
+      }
+    }, 51);
+
     renderFrame();
     audio.play();
   };
+
 
   //connect audio visualizer logic to DOM and execute logic
   useEffect(() => {
@@ -90,6 +124,11 @@ const AudioVisualizer = () => {
     }
   });
 
+
+
+
+
+
   return (
     <div className="App">
 
@@ -97,9 +136,7 @@ const AudioVisualizer = () => {
         <h1>React Audio Visualizer</h1>
       </header>
 
-      <audio preload="auto" className="audio">
-        <source ref={songRef} src="/audioFile.mp3" type="audio/mpeg" />
-      </audio>
+      {/* <audio ref={songRef} src="https://s3-us-west-2.amazonaws.com/s.cdpn.io/858/outfoxing.mp3" crossOrigin="anonymous" ></audio> */}
 
       <main>
         <div>
@@ -117,13 +154,4 @@ const AudioVisualizer = () => {
 export default AudioVisualizer;
 
 
-//performance increase on setTimeouts
 
-// var timeouts = [];
-// timeouts.push(setTimeout(function(){alert(1);}, 200));
-// timeouts.push(setTimeout(function(){alert(2);}, 300));
-// timeouts.push(setTimeout(function(){alert(3);}, 400));
-
-// for (var i=0; i<timeouts.length; i++) {
-//   clearTimeout(timeouts[i]);
-// }
